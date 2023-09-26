@@ -44,6 +44,7 @@ class NNmodel(tf.Module):
 
 
         self.trained = False
+        self.trainable_variables
 
     def forward(self, x):
         for hl in self.hiddenlayers:
@@ -59,19 +60,21 @@ class NNmodel(tf.Module):
                 tape_deriv.watch(x_phys)    
                 y_pred_phys = self.forward(x_phys)
                 y_x = tape_deriv.gradient(y_pred_phys, x_phys)
-                y_xx = tape_deriv.gradient(y_x, x_phys)
-                f = y_xx + b/m*y_x + k/m*y_pred_phys
+            y_xx = tape_deriv.gradient(y_x, x_phys)
+            f = m*y_xx + b*y_x + k*y_pred_phys
             loss_data = loss(y, y_pred_data)
             loss_phys = loss(f, tf.zeros_like(f))
             mseloss = loss_data + 1e-4*loss_phys
-            print(mseloss)
         grad = tape.gradient(mseloss, self.trainable_variables)
-        return grad
+        return mseloss, grad
     
     def train(self, x, y, x_phys, y_phys, m, b, k, epoch = 1000, lr = 1e-4):
         optim = tf.optimizers.Adam(learning_rate = lr)
-        for _ in range(epoch):
-            grad = self.backprop(x, y, x_phys, y_phys, m, b, k)
+        for i in range(epoch):
+            loss, grad = self.backprop(x, y, x_phys, y_phys, m, b, k)
+            if i % 1000 == 0:
+                print(loss)
+
             optim.apply_gradients(zip(grad, self.trainable_variables))
         self.trained = True
 
@@ -98,7 +101,7 @@ x_data = x[0:200:20]
 t_phys = tf.cast(tf.expand_dims(tf.linspace(0, 1, 30), axis = -1), dtype = tf.float32)
 x_phys= tf.exp(-b*t_phys/2*m) * tf.cos(omega*t_phys)
 
-nn.train(t_data, x_data, t_phys, x_phys, m, b, k, epoch = 20000, lr = 1e-4)
+nn.train(t_data, x_data, t_phys, x_phys, m, b, k, epoch = 50000, lr = 1e-4)
 x_pred = nn.predict(t)
 
 plt.plot(t, x, alpha = 0.4)
